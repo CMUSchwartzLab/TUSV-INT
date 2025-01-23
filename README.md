@@ -1,54 +1,59 @@
 # Deconvolution and Phylogeny Inference of Diverse Variant Types Integrating Bulk DNA-seq with Single-cell RNA-seq
 
-This tool aims to deconvolve multi-regional bulk sequencing samples based on variant calls including SVs, SNVs and CNVs and infer a comprehensive tumor phylogenetic tree.
+We develop TUSV-INT, a platform for clonal evolution studies integrating bulk DNA-seq and scRNA-seq to produce clonal evolution models that are unprecendented in their comprehensive accounting for fine clonal structure, genomic coverage, and diverse variant types (SNV, CNA, and SV).  The work uses a general integer linear programming (ILP) framework of clonal lineage reconstruction
 
 
-## Requirements
+## Installation
+The method is built with python 2. To run the program, a python 2.7 conda environment is required. We provide the following commands with the specific packages to install the dependencies - 
 
-The program is written in Python2. Python3 version will come out soon.
+```conda create -n tusvint python=2.7
+conda activate tusvint
+conda config --add channels conda-forge
+conda config --add channels bioconda
+```
 
-The packages you will need to install are listed below.
+Then, you will need the following packages in the  `tusvint` environment. <br>
+      - `numpy` <br>
+      - `pandas` <br>
+      - `ete2` <br>
+      - `gurobipy` <br>
+      - `graphviz` <br>
+      - `biopython=1.76` <br>
+      - `scipy` <br>
+      - `PyVCF`
+- We use the Gurobi optimzer for our method. To acquire Gurobi license, you can sign up as an academic user in the Gurobi website - [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/). 
+  
+## Inputs and Outputs
+### Input
+The input folder should contain the processed variant called scDNAseq files in VCF format. An example can be found in the `simulated_data/sample/` folder. 
 
-* `numpy`
-* `graphviz`
-* `ete2`
-* `biopython`
-* `gurobipy`
-* `PyVCF`
+### Outputs
+- pred_kmeans_clusters.tsv: The clone assignments for the single-cells according to the L1 distances.
+- T.dot: Output tree with the `clone assignments` in the nodes and  `phylogenetic cost/number of SNV and SV mapped` in the branches.
+- M.tsv: Bulk DNA-seq clone in the tree to ScRNA-seq clonal assignment matrix.
+- C.tsv: The estimated copy numbers of the clones.
 
-### Gurobi License
 
-To obtain a Gurobi license, you can sign up as an academic user here [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/) and follow the instructions for downloading a license. 
+## Instructions for running
 
-## Running
+```
+python -u tusv-int.py -i simulation_data/input/sample/ -f simulation_data/input/C_scRNA_CNVs.tsv -o simulation_data/output/ -n 2 -c 10 -t 1 -r 1 -m 20 -b -C 20 -sv_ub 10
+```
+Following inputs are mandatory:
+- `-i` : input folder
+- `-o` : output folder
+- `-n` : number of leaves.
+- `-c` : maximum copy number allowed for any breakpoint or segment on any node
+- `-t` : maximum number of coordinate-descent iterations
+- `-r` : number of random initializations of the coordinate-descent algorithm
+- `-col` : binary flag whether to collapse the redundant nodes
+- `-sv_ub` : the number of subsampled SV breakpoints 
+- `-const` : number of total subsampled breakpoints and SNVs
+- `-m` : maximum time (seconds) in each coordinate descent iteration
 
-`python tusv-ext.py`
-
-The script `tusv-ext.py` takes as input a single directory containing one or multiple `.vcf` files. Go here [https://samtools.github.io/hts-specs/VCFv4.2.pdf](https://samtools.github.io/hts-specs/VCFv4.2.pdf) for specifications on the `.vcf` format. Each `.vcf` file should contain SV breakpoints, CNVs and SNVs with their processed copy numbers from one sample of a patient. 
-
-Inputs:
-* `-i` the input directory containing vcf files of different samples from one patient
-* `-f` the allele specific single-cell RNA sequencing copy numbers saved in a .tsv file. The specific format of this file can be found in `simulation_data/input` directory. 
-* `-o` the output directory with deconvoluted results
-* `-n` number of leaves to infer in phylogenetic tree
-* `-c` maximum copy number allowed for any breakpoint or segment on any node
-* `-t` maximum number of coordinate-descent iterations (program can finish sooner if convergence is reached)
-* `-r` number of random initializations of the coordinate-descent algorithm
-* `-col` binary flag whether to collapse the redundant nodes
-* `-leaf` binary flag whether to assume only leaf nodes are in the mixed samples or not
-* `-sv_ub` approximate maximum number of subsampled breakpoints of structural variants, -1 if you don't want to do the subsampling and include all breakpoints
-* `-const` maximum number of total subsampled breakpoints and SNVs
-
-The following inputs are optional:
-
-* `-b` (recommended) binary flag to automatically set hyper-parameters lambda 1 and lambda 2
-* `-l` lambda 1 hyper-parameter. controls phylogenetic cost
-* `-a` lambda 2 hyper-parameter. controls breakpoint to segment consistancy
-* `-m` maximum time (in seconds) for a single cordinate-descent iteration
-* `-s` number of segments (in addition to those containing breakpoints) that are randomly kept for unmixing. default keeps all segments
-* `-p` (not recommended) number of processors to use. uses all available processors by default
-
-Outputs:
-* `C.tsv` the C matrix which is variants copy number profiles of each clone
-* `U.tsv` the U matrix which is the frequencies of each clone in each sample
-* `T.dot` the inferred phylogenetic tree
+Optional parameters:
+- `-x` : cell consensus percentage within each clone (default = 34)
+- `-b` : binary flag for the regularization parameters to be set automatically
+- `-l` : lambda regularization parameter for weighting the phylogenetic cost
+- `-p` : number of processors to use (uses all the available cores by default)
+- `-s` : number of segments (in addition to those containing breakpoints) that are randomly kept (default keeps all the segments)
