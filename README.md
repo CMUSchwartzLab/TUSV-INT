@@ -36,7 +36,7 @@ Then, you will need the following packages in the  `tusvint` environment. <br>
 
 <a name="input"></a>
 ### Input 
-TUSV-INT requires two types of inputs. The first is a directory with the bulk DNAseq samples with SNVs, CNAs and SVs. The second is the allele-specific CNA calls from scRNA-seq. The details of the inputs are given below - 
+The method requires two types of inputs. The first is a directory with the bulk DNAseq samples containing SNVs, CNAs and SVs. The second is the allele-specific CNA calls from scRNA-seq. The details of the inputs are given below - 
 
 - **Bulk DNA-seq samples**: A directory containing the processed variant calls of the bulk DNAseq samples in `VCF` format. An example can be found in `simulation_data/input/samples/`. 
 - **ScRNA-seq**: The allele-specific clonal copy numbers from scRNA-seq in `.tsv` format. For each scRNA clone, the file will have one row. The first `r` columns will contain the major copy numbers, the later `r` columns will contain the minor copy numbers. Here is a tab-separated version of the file where the first line is the header and rows correspond to scRNA clones -  
