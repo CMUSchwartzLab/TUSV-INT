@@ -25,13 +25,13 @@ Then, you will need the following packages in the  `tusvint` environment. <br>
   
 ## Inputs and Outputs
 ### Input
-The input folder should contain the processed variant called scDNAseq files in VCF format. An example can be found in the `simulated_data/sample/` folder. 
+The input folder should contain the processed variant called scDNAseq files in VCF format. An example can be found in the `simulation_data/input/` folder. 
 
 ### Outputs
-- pred_kmeans_clusters.tsv: The clone assignments for the single-cells according to the L1 distances.
 - T.dot: Output tree with the `clone assignments` in the nodes and  `phylogenetic cost/number of SNV and SV mapped` in the branches.
 - M.tsv: Bulk DNA-seq clone in the tree to ScRNA-seq clonal assignment matrix.
-- C.tsv: The estimated copy numbers of the clones.
+- C.tsv: The variant copy number profile matrix (Size: clones * variants)
+- U.tsv: The clonal Mixture fraction matrix (Size: sample * clones)
 
 
 ## Instructions for running
