@@ -1,4 +1,4 @@
-# Deconvolution and Phylogeny Inference of DiverseVariant Types Integrating Bulk DNA-seq with Single-cell RNA-seq
+# Deconvolution and Phylogeny Inference of Diverse Variant Types Integrating Bulk DNA-seq with Single-cell RNA-seq
 
 This tool aims to deconvolve multi-regional bulk sequencing samples based on variant calls including SVs, SNVs and CNVs and infer a comprehensive tumor phylogenetic tree.
 
