@@ -1,10 +1,18 @@
 # Deconvolution and Phylogeny Inference of Diverse Variant Types Integrating Bulk DNA-seq with Single-cell RNA-seq
 
-We develop TUSV-INT, a platform for clonal evolution studies integrating bulk DNA-seq and scRNA-seq to produce clonal evolution models that are unprecendented in their comprehensive accounting for fine clonal structure, genomic coverage, and diverse variant types (SNV, CNA, and SV).  The work uses a general integer linear programming (ILP) framework of clonal lineage reconstruction
+We develop TUSV-INT, a tool for clonal evolution studies integrating bulk DNA-seq and scRNA-seq with diverse variant types (SNV, CNA, and SV).  The work uses a general integer linear programming (ILP) framework of clonal lineage reconstruction.
 
+## Contents
+1. [Installation](#installation) 
+2. [Running TUSV-INT](#running)
+	- [Input](#input)
+	- [Output](#output)
+3. [Input Settings](#settings)
+4. [Example](#example)
 
+<a name="installation"></a>
 ## Installation
-The method is built with python 2. To run the program, a python 2.7 conda environment is required. We provide the following commands with the specific packages to install the dependencies - 
+TUSV-INT is built with python 2.7. We provide the following commands to set up the environment - 
 
 ```conda create -n tusvint python=2.7
 conda activate tusvint
@@ -22,27 +30,41 @@ Then, you will need the following packages in the  `tusvint` environment. <br>
       - `scipy` <br>
       - `PyVCF`
 - We use the Gurobi optimzer for our method. To acquire Gurobi license, you can sign up as an academic user in the Gurobi website - [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/). 
-  
-## Inputs and Outputs
-### Input
-The input folder should contain the processed variant called scDNAseq files in VCF format. An example can be found in the `simulation_data/input/` folder. 
 
-### Outputs
+<a name="running"></a>
+## Running TUSV-INT
+
+<a name="input"></a>
+### Input 
+TUSV-INT requires two types of inputs. The first is a directory with the bulk DNAseq samples with SNVs, CNAs and SVs. The second is the allele-specific CNA calls from scRNA-seq. The details of the inputs are given below - 
+
+- **Bulk DNA-seq samples**: A directory containing the processed variant calls of the bulk DNAseq samples in `VCF` format. An example can be found in `simulation_data/input/samples/`. 
+- **ScRNA-seq**: The allele-specific clonal copy numbers from scRNA-seq in `.tsv` format. For each scRNA clone, the file will have one row. The first `r` columns will contain the major copy numbers, the later `r` columns will contain the minor copy numbers. Here is a tab-separated version of the file where the first line is the header and rows correspond to scRNA clones -  
+
+| chr_start_end_p |  ..   |  chr_start_end_p  | .. | chr_start_end_m     |  .. | chr_start_end_m |
+| -------- | ------- | ------- | ------- | ------- | ------- | ------- |
+| 1 | .. | 1 | .. | 2 | .. | 1 |
+| 2 | .. | 1 | .. | 1 | .. | 1 |
+| 1 | .. | 1 | .. | 1 | .. | 1 |
+
+ 
+  An example of the inputs can be found in the `simulation_data/input/` folder. 
+
+<a name="output"></a>
+### Output 
 - T.dot: Output tree with the `clone assignments` in the nodes and  `phylogenetic cost/number of SNV and SV mapped` in the branches.
 - M.tsv: Bulk DNA-seq clone in the tree to ScRNA-seq clonal assignment matrix.
 - C.tsv: The variant copy number profile matrix (Size: clones * variants)
 - U.tsv: The clonal Mixture fraction matrix (Size: sample * clones)
 
+<a name="settings"></a>
+## Input Settings
 
-## Instructions for running
-
-```
-python -u tusv-int.py -i simulation_data/input/sample/ -f simulation_data/input/C_scRNA_CNVs.tsv -o simulation_data/output/ -n 2 -c 10 -t 1 -r 1 -m 20 -b -C 20 -sv_ub 10
-```
 Following inputs are mandatory:
-- `-i` : input folder
-- `-o` : output folder
-- `-n` : number of leaves.
+- `-i` : input directory containing bulk DNA-seq VCF files
+-  `-f` : input `.tsv` file containing scRNA-seq CNAs
+- `-o` : output directory
+- `-n` : number of leaves
 - `-c` : maximum copy number allowed for any breakpoint or segment on any node
 - `-t` : maximum number of coordinate-descent iterations
 - `-r` : number of random initializations of the coordinate-descent algorithm
@@ -57,3 +79,10 @@ Optional parameters:
 - `-l` : lambda regularization parameter for weighting the phylogenetic cost
 - `-p` : number of processors to use (uses all the available cores by default)
 - `-s` : number of segments (in addition to those containing breakpoints) that are randomly kept (default keeps all the segments)
+
+<a name="example"></a>
+## Example
+
+```
+python -u tusv-int.py -i simulation_data/input/sample/ -f simulation_data/input/C_scRNA_CNVs.tsv -o simulation_data/output/ -n 2 -c 10 -t 3 -r 3 -m 1000 -b -C 120 -sv_ub 80
+```
