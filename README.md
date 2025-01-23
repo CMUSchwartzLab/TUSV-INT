@@ -1,10 +1,6 @@
-# TUSV-ext: Reconstructing tumor phylogenetic tree with SVs, CNVs and SNVs
+# Deconvolution and Phylogeny Inference of DiverseVariant Types Integrating Bulk DNA-seq with Single-cell RNA-seq
 
 This tool aims to deconvolve multi-regional bulk sequencing samples based on variant calls including SVs, SNVs and CNVs and infer a comprehensive tumor phylogenetic tree.
-
-![pipeline_diagram](https://user-images.githubusercontent.com/44757116/178637052-cdf9be5a-687c-4d13-b8db-e886b506646c.png)
-
-This work is published in Xuecong Fu, Haoyun Lei, Yifeng Tao, Russell Schwartz, Reconstructing tumor clonal lineage trees incorporating single-nucleotide variants, copy number alterations and structural variations, Bioinformatics, Volume 38, Issue Supplement_1, July 2022, Pages i125–i133, https://doi.org/10.1093/bioinformatics/btac253
 
 
 ## Requirements
@@ -32,6 +28,7 @@ The script `tusv-ext.py` takes as input a single directory containing one or mul
 
 Inputs:
 * `-i` the input directory containing vcf files of different samples from one patient
+* `-f` the allele specific single-cell RNA sequencing copy numbers saved in a .tsv file. The specific format of this file can be found in `simulation_data/input` directory. 
 * `-o` the output directory with deconvoluted results
 * `-n` number of leaves to infer in phylogenetic tree
 * `-c` maximum copy number allowed for any breakpoint or segment on any node
