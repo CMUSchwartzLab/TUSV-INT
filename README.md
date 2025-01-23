@@ -1,6 +1,6 @@
 # Deconvolution and Phylogeny Inference of Diverse Variant Types Integrating Bulk DNA-seq with Single-cell RNA-seq
 
-We develop TUSV-INT, a tool for clonal evolution studies integrating bulk DNA-seq and scRNA-seq with diverse variant types (SNV, CNA, and SV).  The work uses a general integer linear programming (ILP) framework of clonal lineage reconstruction.
+We develop TUSV-INT, a tool for clonal evolution studies integrating bulk DNA-seq and scRNA-seq with diverse variant types (SNV, CNA, and SV).  The work uses a general integer linear programming (ILP) framework for clonal lineage reconstruction.
 
 ## Contents
 1. [Installation](#installation) 
