@@ -1,8 +1,8 @@
 # Input: 
 #       -d: sample.vcf in a patient folder
-# Author: Jingyi Wang
+# Author: Jingyi Wang, Nishat Bristy
 # Created date: 2017_09_25
-# Modified date: 2017_10_02
+# Modified date: 2025_06_25
 
 ##################
 ##### IMPORT #####
@@ -67,15 +67,15 @@ def get_mats(in_dir, scrna_file, n, const=120, sv_ub=80):
     F_unsampled_info_phasing = np.array(F_unsampled_info_phasing)
     Q = np.array(Q)
     Q_unsampled = np.array(Q_unsampled)
-
-
+    l = G.shape[0] 
+    g = Q.shape[0] - l 
     abnormal_idx = np.where(np.sum(Q, 1) == 0)[0]
     l_ab_s = len(abnormal_idx[abnormal_idx < l])
     g_ab_s = len(abnormal_idx[abnormal_idx >= (l)])
     print("The mutations at ", abnormal_idx, " will be removed due to non-existing bp in CNV")
     #F = np.delete(F, abnormal_idx, axis=1)
     sampled_sv_list_sort = np.delete(sampled_sv_list_sort, abnormal_idx[abnormal_idx < l])
-    sampled_snv_list_sort = np.delete(sampled_snv_list_sort, abnormal_idx-l)
+    sampled_snv_list_sort = np.delete(sampled_snv_list_sort, abnormal_idx[abnormal_idx>= l]-l)
     F_phasing = np.delete(F_phasing, abnormal_idx, axis=1)
     F_info_phasing = np.delete(F_info_phasing, abnormal_idx, axis=0)
     
@@ -116,7 +116,11 @@ def get_mats(in_dir, scrna_file, n, const=120, sv_ub=80):
     l_un = len(unsampled_sv_list_sort)
     g_un = len(unsampled_snv_list_sort)
     
-    abnormal_idx_unsampled = np.where(np.sum(Q_unsampled, 1) == 0)[0]
+    if Q_unsampled is None or not isinstance(Q_unsampled, np.ndarray) or Q_unsampled.ndim < 2:
+        abnormal_idx_unsampled = np.array([], dtype=int)
+    else:
+        abnormal_idx_unsampled = np.where(np.sum(Q_unsampled, axis=1) == 0)[0]
+    
     l_ab_un = len(abnormal_idx_unsampled[abnormal_idx_unsampled < l_un])
     g_ab_un = len(abnormal_idx_unsampled[abnormal_idx_unsampled >= l_un])
     
@@ -256,6 +260,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             F_phasing, Q, A, H = np.zeros((m, l + g + 2 * r)), np.zeros((l + g,r)), \
                                     np.zeros((m, l)), np.zeros((m, l))
             F_unsampled_phasing, Q_unsampled = None, None
+            F_unsampled_info_phasing = None
             F_info_phasing = make_2d_list(l + g + 2 * r, 3)
             F_SV = F_phasing[:,:l]
             F_SV_info = F_info_phasing[:l]
@@ -266,10 +271,10 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             F_CNV = F_phasing[:,(l+g):]
             F_CNV_info = F_info_phasing[(l+g):]
             Q_unsampled = None
-            # for (chrom, pos), snv_idx in SNV_idx_dict.items():
-            #     F_SNV_info[snv_idx][0] = chrom
-            #     F_SNV_info[snv_idx][1] = pos
-            #     F_SNV_info[snv_idx][2] = "snv_" + str(snv_idx)
+            Q_SV = Q[:l]
+            Q_SNV = Q[l:]
+            G_sampled = G
+            G_unsampled = None
             sampled_sv_idx_list_sorted = np.arange(len(BP_idx_dict))
             unsampled_sv_idx_list_sorted = np.array([])
             sampled_snv_idx_list_sorted = np.arange(len(SNV_idx_dict))
