@@ -47,7 +47,7 @@ MAX_SOLVER_ITERS = 5000
 #  notes: l (int) is number of breakpoints depicting structural variants. r (int) is number of copy number regions, 2r means we phase it for allelic copy numbers,
 #         g (int) is number of single nucleotide variants.
 
-def get_UCE(F_phasing, C_RNA, Q, G, A, H, n, c_max, lamb1, lamb2, max_iters, time_limit=None, only_leaf=False):
+def get_UCE(F_phasing, C_RNA, Q, G, A, H, n, c_max, lamb1, lamb2, max_iters, time_limit=None, only_leaf=False, ancestral=False):
     np.random.seed()  # sets seed for running on multiple processors
     m = len(F_phasing)
     l_g_sample, r = Q.shape
@@ -58,8 +58,8 @@ def get_UCE(F_phasing, C_RNA, Q, G, A, H, n, c_max, lamb1, lamb2, max_iters, tim
         if i == 0:
             U = gen_U(m, n)
         else:
-            U = get_U(F_phasing, C, n, l, only_leaf)
-        obj_val, M, C, E, A, R, W, W_sv, W_snv, err_msg = get_C(F_phasing, C_RNA, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit)
+            U = get_U(F_phasing, C, n, l, only_leaf, ancestral)
+        obj_val, M, C, E, A, R, W, W_sv, W_snv, err_msg = get_C(F_phasing, C_RNA, U, Q, G, A, H, n, c_max, lamb1, lamb2, ancestral, time_limit)
 
         # handle errors
         if err_msg != None:
@@ -78,16 +78,24 @@ def get_UCE(F_phasing, C_RNA, Q, G, A, H, n, c_max, lamb1, lamb2, max_iters, tim
 #         C (np.array of int) [2n-1, l+g+2r] int copy number c_k,s of mutation s in clone k
 #         n (int) number of leaves in phylogeny. 2n-1 is total number of nodes
 # output: U (np.array of float) [m, 2n-1] 0 <= u_p,k <= 1. percent of sample p made by clone k
-def get_U(F_phasing, C, n, l, only_leaf):
+def get_U(F_phasing, C, n, l, only_leaf, ancestral):
     m, L = F_phasing.shape  ### xf: L=l(+g)+2r depending on if SNVs are included
     N = 2 * n - 1
     
     mod = gp.Model('tusv')
     U = _get_gp_arr_cnt_var(mod, m, N, 1.0)
+    
+    Anc = _get_gp_1D_arr_bin_var(mod, N)
+    _set_missing_ancestor_constraints(mod, Anc, n, ancestral)
+    
+    
     for i in xrange(0, m):
         mod.addConstr(gp.quicksum(U[i, :]) == 1.0, "Frequencies sum equals to 1")
         if only_leaf:
             mod.addConstr(gp.quicksum(U[i, n: -1]) == 0.0, "Internal nodes have zero frequencies")
+        if ancestral: 
+            for j in xrange(n, N):
+                mod.addConstr(U[i, j] <= 1 - Anc[j])  # Ancestral constraint. 
     sums = []
     
     for p in xrange(0, m):
@@ -146,18 +154,19 @@ def get_U(F_phasing, C, n, l, only_leaf):
 #         W_all (np.array of int) [2n-1, 2n-1] number of breakpoints appearing along each edge in tree
 #         err_msg (None or str) None if no error occurs. str with error message if one does
 #  notes: l (int) is number of breakpoints. g (int) is the number of single nucleotide variants. r (int) is number of copy number regions
-def get_C(F_phasing, C_RNA, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=None):
+def get_C(F_phasing, C_RNA, U, Q, G, A, H, n, c_max, lamb1, lamb2, ancestral, time_limit=None):
     l_g, r = Q.shape
     #print("r shape",r)
     l, _ = G.shape
     g = l_g - l
     m, _ = U.shape
-    N = 2 * n - 1
+    N = 2 * n - 1 # number of DNA clones
     mod = gp.Model('tusv')
+    N_r, _ = C_RNA.shape # number of RNA clones
 
     C = _get_gp_arr_int_var(mod, N, l + g + 2*r, c_max)  ### xf: C becomes N*(l+2r) ### nb: commented
     #C_lg = _get_gp_arr_int_var(mod, N, l + g, c_max)
-    M = _get_gp_arr_bin_var(mod, N, N) # nb: num_nodes * num_clones
+    M = _get_gp_arr_bin_var(mod, N, N_r) # nb: num_nodes * num_rna_clones
     #C_2r = np.dot(M, C_RNA) ### nb
     #C = np.concatenate((C_lg, C_2r), axis=1) ### nb
     E = _get_gp_arr_bin_var(mod, N, N)
@@ -172,7 +181,7 @@ def get_C(F_phasing, C_RNA, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=No
     F_seg = (F_phasing[:, l_g:-r] + F_phasing[:, -r:]).dot(np.transpose(Q))  # [m, l] mixed copy number of segment containing breakpoint
     Pi = np_divide_0(F_phasing[:, :l_g], F_seg)  # [m, l] expected bpf (ratio of bp copy num to segment copy num)
 
-    _set_matching_constraints(mod, M)
+    _set_matching_constraints(mod, M, ancestral)
     _set_copy_num_constraints(mod, C, n, l, g, r)
     _set_tree_constraints(mod, E, n)
     _set_ancestry_constraints(mod, A, E, N)
@@ -215,15 +224,30 @@ def get_C(F_phasing, C_RNA, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=No
 #   G U R O B I   C O N S T R A I N T S   #
 # # # # # # # # # # # # # # # # # # # # # #
 
-def _set_matching_constraints(mod, M):
+def _set_missing_ancestor_constraints(mod, Anc, n, ancestral):
+    N = 2*n - 1
+    if ancestral:
+        for i in xrange(0, n):
+            mod.addConstr(Anc[i] == 0) # Anc is not for leaf nodes 
+        for i in xrange(n+1, N):
+            mod.addConstr(Anc[i] <= 1) # For ancestral nodes, if missing, Anc[i] = 1
+            
+
+def _set_matching_constraints(mod, M, ancestral):
     # nb: as we are setting the C_RNA matrix as C, its rows will not follow our assumed tree structure. 
     # M matrix is a one-to-one mapping matrix from the nodes to the RNA clones in C_RNA. 
     # M * C will ensure the row ordering. 
-    N = M.shape[0]
-    for i in xrange(0, N):
-        mod.addConstr(sum(M[i,j] for j in range(N)) == 1)
-    for i in xrange(0, N):
-        mod.addConstr(sum(M[j,i] for j in range(N)) == 1)
+    N, N_r = M.shape
+    if not ancestral:
+        for i in xrange(0, N):
+            mod.addConstr(sum(M[i,j] for j in xrange(0,N_r)) == 1) # each DNA clone must have a matching RNA clone
+        for i in xrange(0, N_r):
+            mod.addConstr(sum(M[j,i] for j in xrange(0,N)) <= 1) # all RNA clones might not have a matched DNA clone.
+    else: 
+        for i in xrange(0, N):
+            mod.addConstr(sum(M[i,j] for j in xrange(0,N_r)) == 1) # each DNA clone must have a matching RNA clone (best matching RNA clone)
+        for i in xrange(0, N_r):
+            mod.addConstr(sum(M[j,i] for j in xrange(0,N)) >= 0) # some RNA clones might not have any matched DNA clone, but some might have more than one.
     
     
 
@@ -347,7 +371,7 @@ def _get_objective(mod, F_phasing, U,M, C,C_RNA, R, S, lamb1, lamb2, l_g):  # re
     m, L = F_phasing.shape
     N, _ = C.shape
     _, l = S.shape
-    r = C_RNA.shape[1]
+    N_r, r = C_RNA.shape
     sums = []
     for p in xrange(0, m):
         for s in xrange(0, L):
@@ -363,8 +387,9 @@ def _get_objective(mod, F_phasing, U,M, C,C_RNA, R, S, lamb1, lamb2, l_g):  # re
     # nb: scRNA matching objective sum
     for i in xrange(0, N):
         for j in xrange(0, r):
-            c_hat = gp.quicksum([M[i, k] * C_RNA[k, j] for k in xrange(0, N)])
-            sums.append(_get_abs(mod, C[i, l_g+j] - c_hat))
+            c_hat = gp.quicksum([M[i, k] * C_RNA[k, j] for k in xrange(0, N_r)])
+            sums.append(_get_abs(mod,  (C[i, l_g+j] - c_hat)))
+            
     mod.update()
     return gp.quicksum(sums)
 
