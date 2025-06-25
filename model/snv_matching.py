@@ -1,5 +1,5 @@
-#  author: Xuecong Fu
-#  Match unsampled SNVs (or even breakpoints if necessary) to inferred phylogeny given the results from TUSV-ext
+#  author: Xuecong Fu, Nishat Bristy
+
 
 import numpy as np
 import re
@@ -41,8 +41,11 @@ def snv_assign(C_CNV, Q, A, E, U, F, G):
     :param G: l_un*l_un unsampled breakpoints pairing matrix
     :return:
     """
+    if not isinstance(Q, np.ndarray) or not Q.ndim >= 1:
+        return None, None, None
+    
     n, r = C_CNV.shape
-    l_g_un = Q.shape[0]
+    l_g_un = Q.shape[0] if isinstance(Q, np.ndarray) and Q.ndim >= 1 else 0
     l_un = 0
     if G is not None:
         if G.shape!=():
@@ -67,6 +70,7 @@ def snv_assign(C_CNV, Q, A, E, U, F, G):
         C_SNV_clone_parent_2 = C_hat_2_parent[b, :]
 
         valid_snv_idx = np.array(list(set(np.append(np.where(C_SNV_clone_1 == 1)[0],np.where(C_SNV_clone_1 - C_SNV_clone_parent_1 > 1)[0])))) # nb: 
+        valid_snv_idx = valid_snv_idx.astype(int)
         F_est = U[:,b][:,np.newaxis] * C_SNV_clone_1[valid_snv_idx] + np.dot(U, A[b, :][:,np.newaxis]* C_hat_1[:,valid_snv_idx])
         dist[valid_snv_idx] = np.sum(np.abs(F_est - F[:, valid_snv_idx]),axis=0)
         dist[np.isinf(dist)] = 9999
