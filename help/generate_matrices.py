@@ -1,8 +1,8 @@
 # Input: 
 #       -d: sample.vcf in a patient folder
-# Author: Jingyi Wang
+# Author: Jingyi Wang, Nishat Bristy
 # Created date: 2017_09_25
-# Modified date: 2017_10_02
+# Modified date: 2025_06_25
 
 ##################
 ##### IMPORT #####
@@ -45,7 +45,7 @@ def get_mats(in_dir, scrna_file, n, const=120, sv_ub=80):
         BP_sample_dict[sample], CN_sample_dict[sample], CN_sample_rec_dict[sample], CN_sample_rec_dict_minor[sample], CN_sample_rec_dict_major[sample], mateIDs, toTuple, SNV_sample_dict[sample], C_RNA = get_sample_dict(reader, scrna_df)
         # prepend sample index to each breakpoint ID
         #print(sample, (BP_sample_dict[sample].items()))
-        for k, v in mateIDs.iteritems():
+        for k, v in mateIDs.items():
             bp_id_to_mate_id[str(i+1) + k] = str(i+1) + v # add all entries from mateIDs (dict) to bp_id_to_mate_id (dict)
             bp_id_to_tuple[str(i+1) + k] = toTuple[k]     # add all entries from toTuple (dict) to bp_id_to_tuple (dict)
 
@@ -67,15 +67,15 @@ def get_mats(in_dir, scrna_file, n, const=120, sv_ub=80):
     F_unsampled_info_phasing = np.array(F_unsampled_info_phasing)
     Q = np.array(Q)
     Q_unsampled = np.array(Q_unsampled)
-
-
+    l = G.shape[0] 
+    g = Q.shape[0] - l 
     abnormal_idx = np.where(np.sum(Q, 1) == 0)[0]
     l_ab_s = len(abnormal_idx[abnormal_idx < l])
     g_ab_s = len(abnormal_idx[abnormal_idx >= (l)])
     print("The mutations at ", abnormal_idx, " will be removed due to non-existing bp in CNV")
     #F = np.delete(F, abnormal_idx, axis=1)
     sampled_sv_list_sort = np.delete(sampled_sv_list_sort, abnormal_idx[abnormal_idx < l])
-    sampled_snv_list_sort = np.delete(sampled_snv_list_sort, abnormal_idx-l)
+    sampled_snv_list_sort = np.delete(sampled_snv_list_sort, abnormal_idx[abnormal_idx>= l]-l)
     F_phasing = np.delete(F_phasing, abnormal_idx, axis=1)
     F_info_phasing = np.delete(F_info_phasing, abnormal_idx, axis=0)
     
@@ -116,7 +116,11 @@ def get_mats(in_dir, scrna_file, n, const=120, sv_ub=80):
     l_un = len(unsampled_sv_list_sort)
     g_un = len(unsampled_snv_list_sort)
     
-    abnormal_idx_unsampled = np.where(np.sum(Q_unsampled, 1) == 0)[0]
+    if Q_unsampled is None or not isinstance(Q_unsampled, np.ndarray) or Q_unsampled.ndim < 2:
+        abnormal_idx_unsampled = np.array([], dtype=int)
+    else:
+        abnormal_idx_unsampled = np.where(np.sum(Q_unsampled, axis=1) == 0)[0]
+        
     l_ab_un = len(abnormal_idx_unsampled[abnormal_idx_unsampled < l_un])
     g_ab_un = len(abnormal_idx_unsampled[abnormal_idx_unsampled >= l_un])
     
@@ -147,7 +151,7 @@ def get_mats(in_dir, scrna_file, n, const=120, sv_ub=80):
 def _get_bp_attr(BP_idx_dict):
     inv_BP_idx_dict = _inv_dic(BP_idx_dict) # keys are now index of breakpoints
     chrms, poss, oris, mate_idxs = [], [], [], []
-    for i in sorted(inv_BP_idx_dict.iterkeys()):
+    for i in sorted(inv_BP_idx_dict.keys()):
         chrm, pos, ori = inv_BP_idx_dict[i]
         chrms.append(chrm)
         poss.append(pos)
@@ -266,10 +270,10 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             F_CNV = F_phasing[:,(l+g):]
             F_CNV_info = F_info_phasing[(l+g):]
             Q_unsampled = None
-            # for (chrom, pos), snv_idx in SNV_idx_dict.items():
-            #     F_SNV_info[snv_idx][0] = chrom
-            #     F_SNV_info[snv_idx][1] = pos
-            #     F_SNV_info[snv_idx][2] = "snv_" + str(snv_idx)
+            Q_SV = Q[:l]
+            Q_SNV = Q[l:]
+            G_sampled = G
+            G_unsampled = None
             sampled_sv_idx_list_sorted = np.arange(len(BP_idx_dict))
             unsampled_sv_idx_list_sorted = np.array([])
             sampled_snv_idx_list_sorted = np.arange(len(SNV_idx_dict))
@@ -512,7 +516,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                     F_CNV[sample_idx][cn_idx+r] = cn_major
 
     # create dictionary with key as segment index and val as tuple containing (chrm, bgn, end)
-    cv_attr = { i: (chrm, bgn, end) for chrm, lst in seg_dic.iteritems() for (i, bgn, end) in lst }
+    cv_attr = { i: (chrm, bgn, end) for chrm, lst in seg_dic.items() for (i, bgn, end) in lst }
     return F_phasing, F_unsampled_phasing, G_sampled, G_unsampled, Q, Q_unsampled, A, H, cv_attr, F_info_phasing, F_unsampled_info_phasing, sampled_snv_idx_list_sorted, unsampled_snv_idx_list_sorted, sampled_sv_idx_list_sorted, unsampled_sv_idx_list_sorted
     ### A and H are empty lists
 
@@ -547,7 +551,7 @@ def _get_seg_bgn_end_pos(CN_startPos_dict, CN_endPos_dict):
 # inverts dictionary so keys become values, values become keys
 def _inv_dic(dic):
     inv_dic = {}
-    for k, v in dic.iteritems():
+    for k, v in dic.items():
         inv_dic[v] = k
     return inv_dic
 
@@ -613,7 +617,7 @@ def get_BP_idx_dict(BP_sample_dict):
 
 def _inv_dic(dic):
     inv_dic = {}
-    for k, v in dic.iteritems():
+    for k, v in dic.items():
         inv_dic[v] = k
     return inv_dic
 
@@ -837,13 +841,13 @@ def make_G(bp_tuple_to_idx, bp_id_to_mate_id, bp_id_to_tuple):
     l = len(bp_tuple_to_idx.keys())
     G = np.zeros((l, l))
 
-    for i in xrange(0, l):
+    for i in range(0, l):
         G[i, i] = 1          # breakpoint being its own mate is a requirement for the solver
 
     bp_idx_to_tuple = inv_dict(bp_tuple_to_idx)
     bp_tuple_to_mate_tuple = get_bp_tuple_to_mate_tuple(bp_id_to_mate_id, bp_id_to_tuple)
 
-    for i in sorted(bp_idx_to_tuple.iterkeys()):
+    for i in sorted(bp_idx_to_tuple.keys()):
         cur_tuple = bp_idx_to_tuple[i]
         mate_tup = bp_tuple_to_mate_tuple[cur_tuple]
         j = bp_tuple_to_idx[mate_tup]
@@ -857,7 +861,7 @@ def make_G(bp_tuple_to_idx, bp_id_to_mate_id, bp_id_to_tuple):
 def get_bp_tuple_to_mate_tuple(bp_id_to_mate_id, bp_id_to_tuple):
     out_dic = {}
     bp_tuple_to_id = inv_dict(bp_id_to_tuple)
-    for tup, cur_id in bp_tuple_to_id.iteritems():
+    for tup, cur_id in bp_tuple_to_id.items():
         mate_id = bp_id_to_mate_id[cur_id]
         mate_tup = bp_id_to_tuple[mate_id]
         out_dic[tup] = mate_tup
@@ -867,7 +871,7 @@ def get_bp_tuple_to_mate_tuple(bp_id_to_mate_id, bp_id_to_tuple):
 #   input keys must be static
 def inv_dict(dic):
     idic = {}
-    for k, v in dic.iteritems():
+    for k, v in dic.items():
         idic[v] = k
     return idic
 
