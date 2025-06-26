@@ -12,10 +12,10 @@ We develop TUSV-INT, a tool for clonal evolution studies integrating bulk DNA-se
 
 <a name="installation"></a>
 ## Installation
-TUSV-INT is built with python 2.7. We provide the following commands to set up the environment - 
+This version of TUSV-INT is built with python 3. We provide the following commands to set up the environment - 
 
 ```
-conda create -n tusvint python=2.7
+conda create -n tusvint python=3.10
 conda activate tusvint
 conda config --add channels conda-forge
 conda config --add channels bioconda
