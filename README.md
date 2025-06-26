@@ -24,10 +24,10 @@ conda config --add channels bioconda
 Then, you will need the following packages in the  `tusvint` environment. <br>
       - `numpy` <br>
       - `pandas` <br>
-      - `ete2` <br>
+      - `ete3` <br>
       - `gurobipy` <br>
       - `graphviz` <br>
-      - `biopython=1.76` <br>
+      - `biopython=1.85` <br>
       - `scipy` <br>
       - `PyVCF`
 - We use the Gurobi optimzer for our method. To acquire Gurobi license, you can sign up as an academic user in the Gurobi website - [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/). 
@@ -80,6 +80,7 @@ Optional parameters:
 - `-l` : lambda regularization parameter for weighting the phylogenetic cost
 - `-p` : number of processors to use (uses all the available cores by default)
 - `-s` : number of segments (in addition to those containing breakpoints) that are randomly kept (default keeps all the segments)
+- `-anc` : binary flag, infers missing ancestral clones when set
 
 <a name="example"></a>
 ## Example
