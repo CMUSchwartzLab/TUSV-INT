@@ -1,4 +1,4 @@
-#   author: Jesse Eaton, Xuecong Fu
+#   author: Jesse Eaton, Xuecong Fu, Nishat Bristy
 #   the file is originated from tusv.py from TUSV by Jesse. Xuecong Fu fixed bugs and extend to current model TUSV-est.
 
 # # # # # # # # # # #
@@ -14,9 +14,9 @@ import multiprocessing as mp
 
 from datetime import datetime
 from graphviz import Digraph
-from ete2 import Tree          # for creating phylogenetic trees for .xml output
+from ete3 import Tree          # for creating phylogenetic trees for .xml output
 from Bio import Phylo          # for creating phylogenies to export as phylo .xml files
-from cStringIO import StringIO # for converting string to file (for creating initial phylo .xml)
+from io import StringIO # for converting string to file (for creating initial phylo .xml)
 
 sys.path.insert(0, 'model/')
 sys.path.insert(0, 'help/')
@@ -48,31 +48,31 @@ STR_DTYPE = 'S50'
 def main(argv):
     args = get_args(argv)
     write_readme(args['output_directory'], args)
-    unmix(args['input_directory'], args['output_directory'], args['scRNA_file'], args['num_leaves'], args['c_max'], args['lambda1'], args['lambda2'], args['restart_iters'], args['cord_desc_iters'], args['processors'], args['time_limit'], args['metadata_file'], args['num_subsamples'], args['overide_lambdas'], args['constant'], args['sv_upperbound'], args['only_leaf'], args['collapse'], args['threshold'], args['multi_num_clones'])
+    unmix(args['input_directory'], args['output_directory'], args['scRNA_file'], args['num_leaves'], args['c_max'], args['lambda1'], args['lambda2'], args['restart_iters'], args['cord_desc_iters'], args['processors'], args['time_limit'], args['metadata_file'], args['num_subsamples'], args['overide_lambdas'], args['constant'], args['sv_upperbound'], args['only_leaf'], args['ancestral'], args['collapse'], args['threshold'], args['multi_num_clones'])
 
 
 #  input: num_seg_subsamples (int or None) number of segments to include in deconvolution. these are
 #           in addition to any segments contining an SV as thos are manditory for the SV. None is all segments
 def unmix(in_dir, out_dir, scrna_file, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, num_processors, time_limit, metadata_fname, \
-          num_seg_subsamples, should_overide_lambdas, const, sv_ub, only_leaf, collapse, threshold, multi_num_clones=False):
+          num_seg_subsamples, should_overide_lambdas, const, sv_ub, only_leaf, ancestral, collapse, threshold, multi_num_clones=False):
     
     F_phasing_full, F_unsampled_phasing_full, Q_full, Q_unsampled_full, G, G_unsampled, A, H, bp_attr, cv_attr, F_info_phasing, \
     F_unsampled_info_phasing, sampled_snv_list_sort, unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort, C_RNA, l_ab_s, g_ab_s,l_ab_un, g_ab_un = gm.get_mats(in_dir, scrna_file, n, const=const, sv_ub=sv_ub)
     Q_full, Q_unsampled_full, G, A, H, F_phasing_full, F_unsampled_phasing_full = check_valid_input(Q_full, Q_unsampled_full,G, A, H, F_phasing_full, F_unsampled_phasing_full)
 
-    np.savetxt(out_dir + "/F_info_phasing.csv", F_info_phasing, delimiter='\t', fmt='%s')
-    np.savetxt(out_dir + "/F_unsampled_info_phasing.csv", F_unsampled_info_phasing, delimiter='\t', fmt='%s')
-    np.savetxt(out_dir + "/sampled_snv_list_sort.csv", sampled_snv_list_sort, delimiter='\t', fmt='%d')
-    np.savetxt(out_dir + "/unsampled_snv_list_sort.csv", unsampled_snv_list_sort, delimiter='\t', fmt='%d')
-    np.savetxt(out_dir + "/sampled_sv_list_sort.csv", sampled_sv_list_sort, delimiter='\t', fmt='%d')
-    np.savetxt(out_dir + "/unsampled_sv_list_sort.csv", unsampled_sv_list_sort, delimiter='\t', fmt='%d')
+    safe_savetxt(out_dir + "/F_info_phasing.csv", F_info_phasing, delimiter='\t', fmt='%s')
+    safe_savetxt(out_dir + "/F_unsampled_info_phasing.csv", F_unsampled_info_phasing, delimiter='\t', fmt='%s')
+    safe_savetxt(out_dir + "/sampled_snv_list_sort.csv", sampled_snv_list_sort, delimiter='\t', fmt='%d')
+    safe_savetxt(out_dir + "/unsampled_snv_list_sort.csv", unsampled_snv_list_sort, delimiter='\t', fmt='%d')
+    safe_savetxt(out_dir + "/sampled_sv_list_sort.csv", sampled_sv_list_sort, delimiter='\t', fmt='%d')
+    safe_savetxt(out_dir + "/unsampled_sv_list_sort.csv", unsampled_sv_list_sort, delimiter='\t', fmt='%d')
     F_phasing, Q, Q_unsampled, org_indxs = randomly_remove_segments(F_phasing_full, Q_full, Q_unsampled_full, num_seg_subsamples)
-    np.savetxt(out_dir + '/F_phasing.tsv', F_phasing, delimiter='\t', fmt='%.8f')
-    np.savetxt(out_dir + '/F_unsampled_phasing_full.tsv', F_unsampled_phasing_full, delimiter='\t', fmt='%.8f')
+    safe_savetxt(out_dir + '/F_phasing.tsv', F_phasing, delimiter='\t', fmt='%.8f')
+    safe_savetxt(out_dir + '/F_unsampled_phasing_full.tsv', F_unsampled_phasing_full, delimiter='\t', fmt='%.8f')
     # replace lambda1 and lambda2 with input derived values if should_orveride_lamdas was specified
     m = len(F_phasing)
     l_g, r = Q.shape
-    g_un = Q_unsampled.shape[0]
+    g_un = Q_unsampled.shape[0] if isinstance(Q_unsampled, np.ndarray) and Q_unsampled.ndim >= 1 else 0
     print('The num of features of F is '+str(l_g)+ ', the num of copy numbers is ' +str(r)+ ', the num of unsampled SNV is ' + str(g_un)+ '.')
     if should_overide_lambdas:
 
@@ -82,8 +82,8 @@ def unmix(in_dir, out_dir, scrna_file, n, c_max, lamb1, lamb2, num_restarts, num
     Us, Ms, Cs, Es, As, obj_vals, Rs, Ws, W_SVs, W_SNVs = [], [], [], [], [], [], [], [], [], []
     num_complete = 0
     if not multi_num_clones:
-        for i in xrange(0, num_restarts):
-            U, M, C, E, A_, R, W, W_SV, W_SNV, obj_val, err_msg = sv.get_UCE(F_phasing, C_RNA, Q, G, A, H, n, c_max, lamb1, lamb2, num_cd_iters, time_limit, only_leaf)
+        for i in range(0, num_restarts):
+            U, M, C, E, A_, R, W, W_SV, W_SNV, obj_val, err_msg = sv.get_UCE(F_phasing, C_RNA, Q, G, A, H, n, c_max, lamb1, lamb2, num_cd_iters, time_limit, only_leaf, ancestral)
             printnow(str(i + 1) + ' of ' + str(num_restarts) + ' random restarts complete\n')
             Us.append(U)
             Cs.append(C)
@@ -114,11 +114,11 @@ def unmix(in_dir, out_dir, scrna_file, n, c_max, lamb1, lamb2, num_restarts, num
         else:
             U_best, M_best, C_best, E_best, A_best, R_best, W_best, W_SV_best, W_SNV_best = Us[best_i], Ms[best_i], Cs[best_i], Es[best_i], As[best_i], Rs[best_i], Ws[best_i], W_SVs[best_i], W_SNVs[best_i]
         min_node, min_dist, W_unsampled = snv_assign(C_best[:, -2*r:], Q_unsampled, A_best, E_best, U_best, F_unsampled_phasing_full, G_unsampled)
-        np.savetxt(out_dir + "/unsampled_assignment.csv", min_node, delimiter=',')
-        np.savetxt(out_dir + "/unsampled_assignment_dist.csv", min_dist, delimiter=',')
+        safe_savetxt(out_dir + "/unsampled_assignment.csv", min_node, delimiter=',')
+        safe_savetxt(out_dir + "/unsampled_assignment_dist.csv", min_dist, delimiter=',')
         ### concatenate unsampled SV and SNV list
-        W_SV_unsampled = W_unsampled[:,:len(unsampled_sv_list_sort)]
-        W_SNV_unsampled = W_unsampled[:,len(unsampled_sv_list_sort):]
+        W_SV_unsampled = W_unsampled[:, :len(unsampled_sv_list_sort)] if W_unsampled is not None else np.zeros((0, len(unsampled_sv_list_sort)))
+        W_SNV_unsampled = W_unsampled[:, len(unsampled_sv_list_sort):] if W_unsampled is not None else np.zeros((0, len(unsampled_snv_list_sort)))
         W_con = concatenate_W(W_SV_best, W_SV_unsampled, W_SNV_best, W_SNV_unsampled, sampled_sv_list_sort, unsampled_sv_list_sort, sampled_snv_list_sort, unsampled_snv_list_sort, l_ab_s, g_ab_s,l_ab_un, g_ab_un)
         writer = None #build_vcf_writer(F_phasing_full, C_best, org_indxs, G, Q, bp_attr, cv_attr, metadata_fname)
         B = create_binary_matrix(W_con, A_best)
@@ -138,8 +138,8 @@ def unmix(in_dir, out_dir, scrna_file, n, c_max, lamb1, lamb2, num_restarts, num
                 U, M, C, E, A_, R, W, W_SV, W_SNV = collapse_nodes(U,M,C,E,A_,R,W,W_SV, W_SNV,threshold,only_leaf)
 
             min_node, min_dist, W_SNV_unsampled = snv_assign(C[:, -2 * r:], Q_unsampled, A_, E, U,F_unsampled_phasing_full, G_unsampled)
-            np.savetxt(out_dir + "/unsampled_SNV_assignment.csv", min_node, delimiter=',')
-            np.savetxt(out_dir + "/unsampled_SNV_assignment_dist.csv", min_dist, delimiter=',')
+            safe_savetxt(out_dir + "/unsampled_SNV_assignment.csv", min_node, delimiter=',')
+            safe_savetxt(out_dir + "/unsampled_SNV_assignment_dist.csv", min_dist, delimiter=',')
             W_con, W_snv_con = concatenate_W(W_SV, None, W_SNV, W_SNV_unsampled, None, None, sampled_snv_list_sort,
                                              unsampled_snv_list_sort, l_ab_s, g_ab_s,l_ab_un, g_ab_un) # nb: changed from below 
             #W_con, W_snv_con = concatenate_W(W_SV, W_SNV, W_SNV_unsampled, sampled_snv_list_sort,
@@ -151,7 +151,7 @@ def unmix(in_dir, out_dir, scrna_file, n, c_max, lamb1, lamb2, num_restarts, num
                 os.mkdir(out_dir + '/num_clone_' + str(n_))
             write_to_files(out_dir + '/num_clone_' + str(n_) + '/', l_g, U, M, C, E, R, W, W_SV, W_SNV, W_SNV_unsampled,W_con, obj_val, F_phasing_full,
                            F_unsampled_phasing_full, org_indxs, writer, E_pre, R_pre, W_pre, M_pre, B, A_)
-        np.savetxt(out_dir + '/training_obj_list.csv', training_obj, delimiter='\t')
+        safe_savetxt(out_dir + '/training_obj_list.csv', training_obj, delimiter='\t')
 
 def create_binary_matrix(W_con, A):
     B = copy.deepcopy(W_con)
@@ -188,9 +188,9 @@ def concatenate_W(W_SV_TUSV, W_SV_MATCHING, W_SNV_TUSV, W_SNV_MATCHING, sampled_
         #W_snv_con[:, unsampled_snv_list_sort_idx] = W_SNV_MATCHING
         
         W_snv_con[:, sampled_snv_list_sort] = W_SNV_TUSV
-        W_snv_con[:, unsampled_snv_list_sort] = W_SNV_MATCHING
-    else:
-        W_snv_con = W_SNV_MATCHING
+        if unsampled_snv_list_sort.size > 0 and W_SNV_MATCHING is not None and W_SNV_MATCHING.size > 0:
+            W_snv_con[:, unsampled_snv_list_sort] = W_SNV_MATCHING
+            
     W_con[:, l:] = W_snv_con
     return W_con
 
@@ -218,8 +218,8 @@ def collapse_nodes(U, M, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=Fa
     if not only_leaf:
         # collapse the branches with 0 length
         branch_remove_idx = []
-        for i in xrange(tree.N-1, -1, -1):
-            for j in xrange(tree.N-1, -1, -1):
+        for i in range(tree.N-1, -1, -1):
+            for j in range(tree.N-1, -1, -1):
                 if int(E[i, j]) == 1 and sum(W[j, :]) == 0 and R[i,j] == 0:
                     branch_remove_idx.append(j)
         for node in branch_remove_idx:
@@ -234,7 +234,7 @@ def collapse_nodes(U, M, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=Fa
         # collapse the nodes with 0 frequency
         freq_remove_idx = []
         freq_leaf_remove_idx = []
-        for i in xrange(tree.N-1, -1, -1):
+        for i in range(tree.N-1, -1, -1):
             if i in branch_remove_idx:
                 continue
             if np.mean(U[:, i]) <= threshold:
@@ -255,8 +255,8 @@ def collapse_nodes(U, M, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=Fa
     else:
         # collapse the branches with 0 length and the child of the branch doesn't belong to leaf nodes
         branch_remove_idx = []
-        for i in xrange(tree.N - 1, -1, -1):
-            for j in xrange(tree.N - 1, -1, -1):
+        for i in range(tree.N - 1, -1, -1):
+            for j in range(tree.N - 1, -1, -1):
                 if int(E[i, j]) == 1 and sum(W[j, :]) == 0 and R[i, j] == 0 and not tree.is_leaf(j):
                     branch_remove_idx.append(j)
         for node in branch_remove_idx:
@@ -270,14 +270,14 @@ def collapse_nodes(U, M, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=Fa
         # collapse the leaf nodes with 0 frequency
         freq_remove_idx = []
         freq_leaf_remove_idx = []
-        for i in xrange(tree.N - 1, -1, -1):
+        for i in range(tree.N - 1, -1, -1):
             if i in branch_remove_idx:
                 continue
             if np.mean(U[:, i]) <= threshold and tree.is_leaf(i):
                 freq_leaf_remove_idx.append(i)
         for node in freq_leaf_remove_idx:
             tree.delete_node(node)
-        for i in xrange(tree.N - 1, -1, -1):
+        for i in range(tree.N - 1, -1, -1):
             if tree.num_children(i) == 1:
                 freq_remove_idx.append(i)
         for node in freq_remove_idx:
@@ -315,8 +315,8 @@ class ModifyTree:
         self.tree = {}
         self.E = E
         self.N = len(E)
-        for i in xrange(self.N - 1, -1, -1):
-            for j in xrange(self.N - 1, -1, -1):
+        for i in range(self.N - 1, -1, -1):
+            for j in range(self.N - 1, -1, -1):
                 if int(E[i, j]) == 1:
                     self.cp_tree[j] = i
                     if i not in self.tree.keys():
@@ -373,7 +373,7 @@ def write_readme(dname, args, script_name = os.path.basename(__file__)):
     msg =  '    executed: ' + str(datetime.now()) + '\n'
     msg += 'command used:\n'
     msg += '\t```\n'
-    msg += '\t' + ' '.join(['python', script_name] + [ '--' + str(k) + ' ' + _arg_val_to_str(v) for k, v in args.iteritems() ]) + '\n'
+    msg += '\t' + ' '.join(['python', script_name] + [ '--' + str(k) + ' ' + _arg_val_to_str(v) for k, v in args.items() ]) + '\n'
     msg += '\t```\n'
     fm.append_to_file(readme_fname, msg)
     readme = open(dname + "parameters.txt", 'w')
@@ -403,20 +403,20 @@ def randomly_remove_segments(F_phasing, Q, Q_unsampled, num_seg_subsamples):
     g_un = Q_unsampled.shape[0]
 
     bp_segs = []
-    for s in xrange(0, r):
+    for s in range(0, r):
         if sum(Q[:, s]): # segment s has a breakpoint in it
             bp_segs.append(s)
-    for s in xrange(0, r):
+    for s in range(0, r):
         if sum(Q_unsampled[:, s]): # segment s has a breakpoint in it
             bp_segs.append(s)
-    non_bp_segs = [ s for s in xrange(0, r) if s not in bp_segs ]  # all non breakpoint containing segments
+    non_bp_segs = [ s for s in range(0, r) if s not in bp_segs ]  # all non breakpoint containing segments
     num_seg_subsamples = min(num_seg_subsamples, len(non_bp_segs)) # ensure not removing more segs than we have
     if num_seg_subsamples == len(non_bp_segs):
         return F_phasing, Q, Q_unsampled, None
 
     keeps = random_subset(non_bp_segs, num_seg_subsamples) # segments to keep
     keeps = set(sorted(bp_segs + keeps))
-    drops = [ s for s in xrange(0, r) if s not in keeps ]
+    drops = [ s for s in range(0, r) if s not in keeps ]
 
     Q = np.delete(Q, drops, axis = 1) # remove columns for segments we do not keep
     Q_unsampled = np.delete(Q_unsampled, drops, axis=1)
@@ -472,16 +472,16 @@ def build_vcf_writer(F_phasing_full, C, org_indices, G, Q, bp_attr, cv_attr, met
     
     if org_indices is not None: # only fill in values for segments not used if did not use some segments
         org_indices_minor = [org_indices[i] + r for i in range(len(org_indices))]
-        c_org_indices = [ i for i in xrange(0, l_g) ] + org_indices + org_indices_minor
+        c_org_indices = [ i for i in range(0, l_g) ] + org_indices + org_indices_minor
         C_out = -1*np.ones((n, l_g+2*r), dtype = float) # C with segments that were removed inserted back in with avg from F_full
         C_out[:, c_org_indices] = C[:, :]           #   -1 is an indicator that this column should be omitted in validation
         C = C_out
     
     w = vh.Writer(m, n, metadata_fname)
-    bp_ids = np.array([ 'bp' + str(b+1) for b in xrange(0, l) ], dtype = STR_DTYPE)
-    for b in xrange(0, l): # force a breakpoint to not be mated with self
+    bp_ids = np.array([ 'bp' + str(b+1) for b in range(0, l) ], dtype = STR_DTYPE)
+    for b in range(0, l): # force a breakpoint to not be mated with self
         G[b, b] = 0
-    for b in xrange(0, l):
+    for b in range(0, l):
         chrm, pos, ext_left = bp_attr[b]
         rec_id = bp_ids[b]
         mate_id = bp_ids[np.where(G[b, :])[0][0]]
@@ -490,10 +490,10 @@ def build_vcf_writer(F_phasing_full, C, org_indices, G, Q, bp_attr, cv_attr, met
         if cps[0] < 0:
             cps = []
         w.add_bp(chrm, pos, ext_left, rec_id, mate_id, fs, cps)
-    snv_ids = [ 'snv' + str(s+1) for s in xrange(0, g) ]
+    snv_ids = [ 'snv' + str(s+1) for s in range(0, g) ]
 
-    cv_ids = [ 'cnv' + str(s+1) for s in xrange(0, r) ]
-    for s in xrange(0, r):
+    cv_ids = [ 'cnv' + str(s+1) for s in range(0, r) ]
+    for s in range(0, r):
         chrm, bgn, end = cv_attr[s]
         rec_id = cv_ids[s]
         fs = list(F_phasing_full[:, s + l_g])
@@ -515,7 +515,7 @@ def write_to_files(d, l_g, U, M, C, E, R, W, W_SV, W_SNV, W_SNV_UNSAMPLED, W_con
     n, _ = C.shape
     if org_indices is not None:
         org_indices_minor = [org_indices[i] + r for i in range(len(org_indices))]
-        c_org_indices = [ i for i in xrange(0, l_g) ] + org_indices + org_indices_minor
+        c_org_indices = [ i for i in range(0, l_g) ] + org_indices + org_indices_minor
         C_out = -1*np.ones((n, l_g+2*r), dtype = float) # C with segments that were removed inserted back in with avg from F_full
         C_out[:, c_org_indices] = C[:, :]           #   -1 is an indicator that this column should be omitted in validation
     else:
@@ -524,20 +524,20 @@ def write_to_files(d, l_g, U, M, C, E, R, W, W_SV, W_SNV, W_SNV_UNSAMPLED, W_con
     fnames = [ d + fname for fname in ['U.tsv', 'C.tsv', 'T.dot', 'F.tsv',  'W.tsv', 'obj_val.txt', 'unmixed.vcf', 'unmixed.xml','F_phasing_full.tsv','F_unsampled_phasing_full.tsv', 'W_SV.tsv', 'W_SNV_sampled.tsv', 'W_SNV_unsampled.tsv', 'W_CONCATENATE.tsv', 'T_pre.dot', 'B.tsv', 'A.tsv', 'M.tsv', 'M_pre.tsv'] ]
     for fname in fnames:
         fm.touch(fname)
-    np.savetxt(fnames[0], U, delimiter = '\t', fmt = '%.8f')
-    np.savetxt(fnames[17], M, delimiter = '\t', fmt = '%.8f')
-    np.savetxt(fnames[18], M_pre, delimiter = '\t', fmt = '%.8f')
-    np.savetxt(fnames[1], C_out, delimiter = '\t', fmt = '%.8f')
-    np.savetxt(fnames[4], W, delimiter = '\t', fmt = '%d')
-    np.savetxt(fnames[10], W_SV, delimiter='\t', fmt='%d')
-    np.savetxt(fnames[11], W_SNV, delimiter='\t', fmt='%d')
-    np.savetxt(fnames[12], W_SNV_UNSAMPLED, delimiter='\t', fmt='%d')
-    np.savetxt(fnames[13], W_con, delimiter='\t', fmt='%d')
-    np.savetxt(fnames[15], B, delimiter='\t', fmt='%d')
-    np.savetxt(fnames[16], A, delimiter='\t', fmt='%d')
-    np.savetxt(fnames[5], np.array([obj_val]), delimiter = '\t', fmt = '%.8f')
-    np.savetxt(fnames[8], F_phasing_full, delimiter='\t', fmt='%.8f')
-    np.savetxt(fnames[9], F_unsampled_phasing_full, delimiter='\t', fmt='%.8f')
+    safe_savetxt(fnames[0], U, delimiter = '\t', fmt = '%.8f')
+    safe_savetxt(fnames[17], M, delimiter = '\t', fmt = '%.8f')
+    safe_savetxt(fnames[18], M_pre, delimiter = '\t', fmt = '%.8f')
+    safe_savetxt(fnames[1], C_out, delimiter = '\t', fmt = '%.8f')
+    safe_savetxt(fnames[4], W, delimiter = '\t', fmt = '%d')
+    safe_savetxt(fnames[10], W_SV, delimiter='\t', fmt='%d')
+    safe_savetxt(fnames[11], W_SNV, delimiter='\t', fmt='%d')
+    safe_savetxt(fnames[12], W_SNV_UNSAMPLED, delimiter='\t', fmt='%d')
+    safe_savetxt(fnames[13], W_con, delimiter='\t', fmt='%d')
+    safe_savetxt(fnames[15], B, delimiter='\t', fmt='%d')
+    safe_savetxt(fnames[16], A, delimiter='\t', fmt='%d')
+    safe_savetxt(fnames[5], np.array([obj_val]), delimiter = '\t', fmt = '%.8f')
+    safe_savetxt(fnames[8], F_phasing_full, delimiter='\t', fmt='%.8f')
+    safe_savetxt(fnames[9], F_unsampled_phasing_full, delimiter='\t', fmt='%.8f')
     #writer.write(open(fnames[6], 'w'))
     dot = to_dot(E, R, W)
     open(fnames[2], 'w').write(dot.source) # write tree T in dot format
@@ -549,7 +549,15 @@ def write_to_files(d, l_g, U, M, C, E, R, W, W_SV, W_SNV, W_SNV_UNSAMPLED, W_con
     dot.render(d + 'T_pre')
     write_xml(fnames[7], E, C, l_g)
     
-
+# checks whether numpy array "array" can be saved. This is to check for None arrays.
+# input: path (str) path to save the file
+#        array (np.array or None) numpy array to save
+def safe_savetxt(path, array, delimiter='\t', fmt='%s'):
+    if isinstance(array, np.ndarray) and array.ndim >= 1 and array.size > 0:
+        np.savetxt(path, array, delimiter=delimiter, fmt=fmt)
+    else:
+        open(path, 'w').close()
+        
 #  input: E (np.array of int) [2n-1, 2n-1] 0 if no edge, 1 if edge between nodes i and j
 #         R (np.array of int) [2n-1, 2n-1] cost of each edge in the tree
 #         W (np.array of int) [2n-1, l] W[i, b] == 1 iff breakpoint b appears at node v_i. 0 otherwise
@@ -558,8 +566,8 @@ def to_dot(E, R, W):
     N = len(E)
     dot = Digraph(format = 'png')
     dot.node(str(N-1))
-    for i in xrange(N-1, -1, -1):
-        for j in xrange(N-1, -1, -1):
+    for i in range(N-1, -1, -1):
+        for j in range(N-1, -1, -1):
             if int(E[i, j]) == 1:
                 num_breakpoints = sum(W[j, :])
                 edge_label = ' ' + str(int(R[i, j])) + '/' + str(num_breakpoints)
@@ -616,16 +624,19 @@ def check_valid_input(Q, Q_unsampled, G, A, H,F_phasing_full, F_unsampled_phasin
     sys.stdout.flush()
     
     raiseif(not np.all(np.sum(Q, 1) == 1), Q_msg)
-    raiseif(not np.all(np.sum(Q_unsampled, 1) == 1), Q_unsampled_msg)
+    if Q_unsampled is None or not isinstance(Q_unsampled, np.ndarray) or Q_unsampled.ndim < 2:
+        print("No unsampled SNV-SV")
+    else:
+        raiseif(not np.all(np.sum(Q_unsampled, 1) == 1), Q_unsampled_msg)
 
     raiseif(not np.all(np.sum(G, 0) == 2) or not np.all(np.sum(G, 1) == 2), G_msg)
-    for i in xrange(0, l):
-        for j in xrange(0, l):
+    for i in range(0, l):
+        for j in range(0, l):
             raiseif(G[i, j] != G[j, i], G_msg)
             raiseif(i == j and G[i, j] != 1, G_msg)
 
-    for p in xrange(0, m):
-        for b in xrange(0, l):
+    for p in range(0, m):
+        for b in range(0, l):
             raiseif(A[p, b] < 0 or A[p, b] > H[p, b], A_msg)
     return Q, Q_unsampled, G, A, H, F_phasing_full, F_unsampled_phasing_full
 
@@ -662,7 +673,8 @@ def set_non_dir_args(parser):
     parser.add_argument('-b', '--overide_lambdas', action = 'store_true', help = 'specify this argument if you would like the parameters lambda1 and lambda2 to be set proportional to the input data set')
     parser.add_argument('-C', '--constant', default = 120, type = int, help = 'scaling constant for sampling SNVs')
     parser.add_argument('-sv_ub', '--sv_upperbound', default = -1, type = int, help = 'scaling constant for sampling SVs')
-    parser.add_argument('-leaf', '--only_leaf', action = 'store_true', help = 'if only deconvolute for leaves')
+    parser.add_argument('-leaf', '--only_leaf', action = 'store_true', help = 'if only deconvolve for leaves')
+    parser.add_argument('-anc', '--ancestral', action = 'store_true', help = 'if deconvolve for the ancestral clones as well')
     parser.add_argument('-col', '--collapse', action='store_true', help='if collapse nodes')
     parser.add_argument('-th', '--threshold', default = 0.0, type = lambda x: fm.valid_float_above(parser, x, 0.0), help = 'mean frequency threshold to collapsing')
     parser.add_argument('-scan', '--multi_num_clones', action='store_true', help='Scan a range of number of clones to get optimal number of clones')
