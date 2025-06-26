@@ -80,7 +80,7 @@ Optional parameters:
 - `-l` : lambda regularization parameter for weighting the phylogenetic cost
 - `-p` : number of processors to use (uses all the available cores by default)
 - `-s` : number of segments (in addition to those containing breakpoints) that are randomly kept (default keeps all the segments)
-
+- `-anc` : binary flag, infers missing ancestral clones when set
 <a name="example"></a>
 ## Example
 
