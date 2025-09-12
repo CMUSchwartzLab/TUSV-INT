@@ -246,8 +246,8 @@ def _set_matching_constraints(mod, M, ancestral):
     else: 
         for i in xrange(0, N):
             mod.addConstr(sum(M[i,j] for j in xrange(0,N_r)) == 1) # each DNA clone must have a matching RNA clone (best matching RNA clone)
-        #for i in xrange(0, N_r):
-        #    mod.addConstr(sum(M[j,i] for j in xrange(0,N)) >= 0) # some RNA clones might not have any matched DNA clone, but some might have more than one.
+        for i in xrange(0, N_r):
+            mod.addConstr(sum(M[j,i] for j in xrange(0,N)) >= 0) # some RNA clones might not have any matched DNA clone, but some might have more than one.
     
     
 
